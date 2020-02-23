@@ -7,8 +7,8 @@ const TGAColor white = TGAColor(255, 255, 255, 255);
 const TGAColor red = TGAColor(255, 0, 0, 255);
 const TGAColor green = TGAColor(0, 255, 0, 255);
 
-const int width = 800;
-const int height = 800;
+const int width = 200;
+const int height = 200;
 
 void drawLine(int x1, int y1, int x2, int y2, TGAImage& image, TGAColor color)
 {
@@ -91,6 +91,68 @@ void drawTriangle(Vec2i t1, Vec2i t2, Vec2i t3, TGAImage& image, TGAColor color)
     }
 }
 
+Vec3f cross(Vec3f a, Vec3f b)
+{
+    return Vec3f(
+        a.y * b.z - a.z * b.y,
+        -(a.x * b.z - a.z * b.x),
+        a.x * b.y - a.y * b.x
+    );
+}
+
+Vec3f getBarycenticCoord(Vec2i* pTriangle, Vec2i p)
+{
+    Vec3f u = cross(
+        Vec3f(
+            (float)(pTriangle[2].x - pTriangle[0].x),
+            (float)(pTriangle[1].x - pTriangle[0].x),
+            (float)(pTriangle[0].x - p.x)
+        ),
+        Vec3f(
+            (float)(pTriangle[2].y - pTriangle[0].y),
+            (float)(pTriangle[1].y - pTriangle[0].y),
+            (float)(pTriangle[0].y - p.y)
+        )
+    );
+    /* `pts` and `P` has integer value as coordinates
+       so `abs(u[2])` < 1 means `u[2]` is 0, that means
+       triangle is degenerate, in this case return something with negative coordinates */
+    if(std::abs(u.z) < 1) return Vec3f(-1, 1, 1);
+    return Vec3f(1.f - (u.x + u.y) / u.z, u.y / u.z, u.x / u.z);
+}
+
+void drawTriangle2(Vec2i t1, Vec2i t2, Vec2i t3, TGAImage& image, TGAColor color)
+{
+    Vec2i tri[3] = { t1, t2, t3 };
+    Vec2i boxMin = t1;
+    Vec2i boxMax = t1;
+
+    if(boxMin.x > t2.x) boxMin.x = t2.x;
+    if(boxMax.x < t2.x) boxMax.x = t2.x;
+    if(boxMin.y > t2.y) boxMin.y = t2.y;
+    if(boxMax.y < t2.y) boxMax.y = t2.y;
+    if(boxMin.x > t3.x) boxMin.x = t3.x;
+    if(boxMax.x < t3.x) boxMax.x = t3.x;
+    if(boxMin.y > t3.y) boxMin.y = t3.y;
+    if(boxMax.y < t3.y) boxMax.y = t3.y;
+
+    if(boxMin.x < 0) boxMin.x = 0;
+    if(boxMin.y < 0) boxMin.y = 0;
+    int imageWidth = image.get_width() - 1;
+    int imageHeight = image.get_height() - 1;
+    if(boxMax.x > imageWidth) boxMax.x = imageWidth;
+    if(boxMax.y > imageHeight) boxMax.y = imageHeight;
+
+    Vec2i p;
+    for(p.x = boxMin.x; p.x <= boxMax.x; p.x++) {
+        for(p.y = boxMin.y; p.y <= boxMax.y; p.y++) {
+            Vec3f s = getBarycenticCoord(tri, p);
+            if(s.x < 0 || s.y < 0 || s.z < 0) continue;
+            image.set(p.x, p.y, color);
+        }
+    }
+}
+
 void drawModel(TGAImage& image)
 {
     Model m = Model("obj/african_head.obj");
@@ -123,6 +185,8 @@ int main(void)
     drawTriangle(t0[0], t0[1], t0[2], image, red);
     drawTriangle(t1[0], t1[1], t1[2], image, white);
     drawTriangle(t2[0], t2[1], t2[2], image, green);
+
+    drawTriangle2(Vec2i(10, 10), Vec2i(100, 30), Vec2i(190, 160), image, green);
 
     image.flip_vertically();
     image.write_tga_file("output.tga");
