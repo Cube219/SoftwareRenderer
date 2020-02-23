@@ -3,11 +3,11 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="tgaimage.cpp" />
+    <ClCompile Include="model.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="tgaimage.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <Image Include="output.tga" />
+    <ClInclude Include="geometry.h" />
+    <ClInclude Include="model.h" />
   </ItemGroup>
 </Project>

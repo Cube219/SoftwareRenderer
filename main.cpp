@@ -1,6 +1,10 @@
 ﻿#include <iostream>
 
 #include "tgaimage.h"
+#include "model.h"
+
+const int width = 800;
+const int height = 800;
 
 void drawLine(int x1, int y1, int x2, int y2, TGAImage& image, TGAColor color)
 {
@@ -50,11 +54,25 @@ void drawLine(int x1, int y1, int x2, int y2, TGAImage& image, TGAColor color)
 
 int main(void)
 {
-    TGAImage image(100, 100, TGAImage::RGB);
+    Model m = Model("obj/african_head.obj");
 
-    drawLine(13, 20, 80, 40, image, TGAColor(255, 255, 255, 255));
-    drawLine(20, 13, 40, 80, image, TGAColor(255, 0, 0, 255));
-    drawLine(80, 40, 13, 20, image, TGAColor(255, 0, 0, 255));
+    TGAImage image(width, height, TGAImage::RGB);
+
+    for(int i = 0; i < m.nfaces(); i++) {
+        std::vector<int> face = m.face(i);
+        
+        for(int j = 0; j < 3; j++) {
+            Vec3f v1 = m.vert(face[j]);
+            Vec3f v2 = m.vert(face[(j+1)%3]);
+
+            int x1 = (v1.x + 1.0f) * (width / 2);
+            int y1 = (v1.y + 1.0f) * (height / 2);
+            int x2 = (v2.x + 1.0f) * (width / 2);
+            int y2 = (v2.y + 1.0f) * (height / 2);
+
+            drawLine(x1, y1, x2, y2, image, TGAColor(255, 255, 255, 255));
+        }
+    }
 
     image.flip_vertically();
     image.write_tga_file("output.tga");
