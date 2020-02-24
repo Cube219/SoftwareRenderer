@@ -7,8 +7,8 @@ const TGAColor white = TGAColor(255, 255, 255, 255);
 const TGAColor red = TGAColor(255, 0, 0, 255);
 const TGAColor green = TGAColor(0, 255, 0, 255);
 
-const int width = 200;
-const int height = 200;
+const int width = 800;
+const int height = 800;
 
 void drawLine(int x1, int y1, int x2, int y2, TGAImage& image, TGAColor color)
 {
@@ -157,19 +157,26 @@ void drawModel(TGAImage& image)
 {
     Model m = Model("obj/african_head.obj");
 
+    Vec3f lightDir = Vec3f(0, 0, -1);
+
     for(int i = 0; i < m.nfaces(); i++) {
         std::vector<int> face = m.face(i);
 
+        Vec2i screen[3];
+        Vec3f world[3];
         for(int j = 0; j < 3; j++) {
-            Vec3f v1 = m.vert(face[j]);
-            Vec3f v2 = m.vert(face[(j + 1) % 3]);
+            Vec3f v = m.vert(face[j]);
 
-            int x1 = (int)((v1.x + 1.0f) * (width / 2));
-            int y1 = (int)((v1.y + 1.0f) * (height / 2));
-            int x2 = (int)((v2.x + 1.0f) * (width / 2));
-            int y2 = (int)((v2.y + 1.0f) * (height / 2));
+            screen[j] = Vec2i(int((v.x + 1.0f) * (width / 2)), int((v.y + 1.0f) * (height / 2)));
+            world[j] = v;
+        }
 
-            drawLine(x1, y1, x2, y2, image, TGAColor(255, 255, 255, 255));
+        Vec3f n = (world[2] - world[1]) ^ (world[2] - world[0]);
+        n.normalize();
+        float intensity = n * lightDir;
+        
+        if(intensity > 0) {
+            drawTriangle(screen[0], screen[1], screen[2], image, TGAColor(intensity * 255, intensity * 255, intensity * 255, 255));
         }
     }
 }
@@ -187,6 +194,8 @@ int main(void)
     drawTriangle(t2[0], t2[1], t2[2], image, green);
 
     drawTriangle2(Vec2i(10, 10), Vec2i(100, 30), Vec2i(190, 160), image, green);
+
+    drawModel(image);
 
     image.flip_vertically();
     image.write_tga_file("output.tga");
