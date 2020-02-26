@@ -181,13 +181,14 @@ void drawModel(float* pZBuf, TGAImage& image)
 
     Vec3f lightDir = Vec3f(0, 0, -1);
 
+    FaceInfo face[3];
     for(int i = 0; i < m.nfaces(); i++) {
-        std::vector<int> face = m.face(i);
+        std::tie(face[0], face[1], face[2]) = m.face(i);
 
         Vec3f screen[3];
         Vec3f world[3];
         for(int j = 0; j < 3; j++) {
-            Vec3f v = m.vert(face[j]);
+            Vec3f v = m.vert(face[j].vertIndex);
 
             screen[j] = Vec3f(int((v.x + 1.0f) * (width / 2)), int((v.y + 1.0f) * (height / 2)), v.z);
             world[j] = v;
