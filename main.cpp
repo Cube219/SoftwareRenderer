@@ -56,7 +56,30 @@ void drawLine(int x1, int y1, int x2, int y2, TGAImage& image, TGAColor color)
     }
 }
 
-void drawTriangle(Vec2i t1, Vec2i t2, Vec2i t3, TGAImage& image, TGAColor color)
+Vec3f cross(Vec3f a, Vec3f b)
+{
+    return Vec3f(
+        a.y * b.z - a.z * b.y,
+        -(a.x * b.z - a.z * b.x),
+        a.x * b.y - a.y * b.x
+    );
+}
+
+Vec3f getBarycentricCoord(Vec3f a, Vec3f b, Vec3f c, Vec3f p)
+{
+    Vec3f s1 = Vec3f(c.x - a.x, b.x - a.x, a.x - p.x);
+    Vec3f s2 = Vec3f(c.y - a.y, b.y - a.y, a.y - p.y);
+
+    Vec3f u = cross(s1, s2);
+
+    /* `pts` and `P` has integer value as coordinates
+       so `abs(u[2])` < 1 means `u[2]` is 0, that means
+       triangle is degenerate, in this case return something with negative coordinates */
+    if(std::abs(u.z) < 1e-2) return Vec3f(-1, 1, 1);
+    return Vec3f(1.f - (u.x + u.y) / u.z, u.y / u.z, u.x / u.z);
+}
+
+void drawTriangle(Vec3f t1, Vec3f t2, Vec3f t3, float* pZBuf, TGAImage& image, TGAColor color)
 {
     if(t1.y > t2.y) std::swap(t1, t2);
     if(t1.y > t3.y) std::swap(t1, t3);
@@ -72,7 +95,17 @@ void drawTriangle(Vec2i t1, Vec2i t2, Vec2i t3, TGAImage& image, TGAColor color)
 
         if(aX > bX) std::swap(aX, bX);
         for(int x = (int)aX; x <= (int)bX; x++) {
-            image.set(x, y, color);
+            Vec3f s = getBarycentricCoord(t1, t2, t3, Vec3f(x, y, 0));
+
+            float z = t1.z * s.x;
+            z += t2.z * s.y;
+            z += t3.z * s.z;
+
+            int zBufIndex = x + y * width;
+            if(pZBuf[zBufIndex] < z) {
+                pZBuf[zBufIndex] = z;
+                image.set(x, y, color);
+            }
         }
     }
 
@@ -86,46 +119,26 @@ void drawTriangle(Vec2i t1, Vec2i t2, Vec2i t3, TGAImage& image, TGAColor color)
 
         if(aX > bX) std::swap(aX, bX);
         for(int x = (int)aX; x <= (int)bX; x++) {
-            image.set(x, y, color);
+            Vec3f s = getBarycentricCoord(t1, t2, t3, Vec3f(x, y, 0));
+
+            float z = t1.z * s.x;
+            z += t2.z * s.y;
+            z += t3.z * s.z;
+
+            int zBufIndex = x + y * width;
+            if(pZBuf[zBufIndex] < z) {
+                pZBuf[zBufIndex] = z;
+                image.set(x, y, color);
+            }
         }
     }
 }
 
-Vec3f cross(Vec3f a, Vec3f b)
+void drawTriangle2(Vec3f t1, Vec3f t2, Vec3f t3, float* pZBuf, TGAImage& image, TGAColor color)
 {
-    return Vec3f(
-        a.y * b.z - a.z * b.y,
-        -(a.x * b.z - a.z * b.x),
-        a.x * b.y - a.y * b.x
-    );
-}
-
-Vec3f getBarycenticCoord(Vec2i* pTriangle, Vec2i p)
-{
-    Vec3f u = cross(
-        Vec3f(
-            (float)(pTriangle[2].x - pTriangle[0].x),
-            (float)(pTriangle[1].x - pTriangle[0].x),
-            (float)(pTriangle[0].x - p.x)
-        ),
-        Vec3f(
-            (float)(pTriangle[2].y - pTriangle[0].y),
-            (float)(pTriangle[1].y - pTriangle[0].y),
-            (float)(pTriangle[0].y - p.y)
-        )
-    );
-    /* `pts` and `P` has integer value as coordinates
-       so `abs(u[2])` < 1 means `u[2]` is 0, that means
-       triangle is degenerate, in this case return something with negative coordinates */
-    if(std::abs(u.z) < 1) return Vec3f(-1, 1, 1);
-    return Vec3f(1.f - (u.x + u.y) / u.z, u.y / u.z, u.x / u.z);
-}
-
-void drawTriangle2(Vec2i t1, Vec2i t2, Vec2i t3, TGAImage& image, TGAColor color)
-{
-    Vec2i tri[3] = { t1, t2, t3 };
-    Vec2i boxMin = t1;
-    Vec2i boxMax = t1;
+    // Vec3f tri[3] = { t1, t2, t3 };
+    Vec2f boxMin = Vec2f(t1.x, t1.y);
+    Vec2f boxMax = Vec2f(t1.x, t1.y);
 
     if(boxMin.x > t2.x) boxMin.x = t2.x;
     if(boxMax.x < t2.x) boxMax.x = t2.x;
@@ -143,17 +156,26 @@ void drawTriangle2(Vec2i t1, Vec2i t2, Vec2i t3, TGAImage& image, TGAColor color
     if(boxMax.x > imageWidth) boxMax.x = imageWidth;
     if(boxMax.y > imageHeight) boxMax.y = imageHeight;
 
-    Vec2i p;
+    Vec3f p;
     for(p.x = boxMin.x; p.x <= boxMax.x; p.x++) {
         for(p.y = boxMin.y; p.y <= boxMax.y; p.y++) {
-            Vec3f s = getBarycenticCoord(tri, p);
+            Vec3f s = getBarycentricCoord(t1, t2, t3, p);
             if(s.x < 0 || s.y < 0 || s.z < 0) continue;
-            image.set(p.x, p.y, color);
+
+            p.z = t1.z * s.x;
+            p.z += t2.z * s.y;
+            p.z += t3.z * s.z;
+            
+            int zBufIndex = int(p.x) + int(p.y * width);
+            if(pZBuf[zBufIndex] < p.z) {
+                pZBuf[zBufIndex] = p.z;
+                image.set(p.x, p.y, color);
+            }
         }
     }
 }
 
-void drawModel(TGAImage& image)
+void drawModel(float* pZBuf, TGAImage& image)
 {
     Model m = Model("obj/african_head.obj");
 
@@ -162,12 +184,12 @@ void drawModel(TGAImage& image)
     for(int i = 0; i < m.nfaces(); i++) {
         std::vector<int> face = m.face(i);
 
-        Vec2i screen[3];
+        Vec3f screen[3];
         Vec3f world[3];
         for(int j = 0; j < 3; j++) {
             Vec3f v = m.vert(face[j]);
 
-            screen[j] = Vec2i(int((v.x + 1.0f) * (width / 2)), int((v.y + 1.0f) * (height / 2)));
+            screen[j] = Vec3f(int((v.x + 1.0f) * (width / 2)), int((v.y + 1.0f) * (height / 2)), v.z);
             world[j] = v;
         }
 
@@ -176,29 +198,34 @@ void drawModel(TGAImage& image)
         float intensity = n * lightDir;
         
         if(intensity > 0) {
-            drawTriangle(screen[0], screen[1], screen[2], image, TGAColor(intensity * 255, intensity * 255, intensity * 255, 255));
+            drawTriangle(screen[0], screen[1], screen[2], pZBuf, image, TGAColor(intensity * 255, intensity * 255, intensity * 255, 255));
         }
     }
 }
 
 int main(void)
 {
-
+    float* zBuffer = new float[width * height];
+    for(int i = 0; i < width * height; i++) {
+        zBuffer[i] = -std::numeric_limits<float>::max();
+    }
     TGAImage image(width, height, TGAImage::RGB);
 
-    Vec2i t0[3] = { Vec2i(10, 70),   Vec2i(50, 160),  Vec2i(70, 80) };
-    Vec2i t1[3] = { Vec2i(180, 50),  Vec2i(150, 1),   Vec2i(70, 180) };
-    Vec2i t2[3] = { Vec2i(180, 150), Vec2i(120, 160), Vec2i(130, 180) };
-    drawTriangle(t0[0], t0[1], t0[2], image, red);
-    drawTriangle(t1[0], t1[1], t1[2], image, white);
-    drawTriangle(t2[0], t2[1], t2[2], image, green);
+    Vec3f t0[3] = { Vec3f(10, 70, 0),   Vec3f(50, 160, 0),  Vec3f(70, 80, 0) };
+    Vec3f t1[3] = { Vec3f(180, 50, 1),  Vec3f(150, 1, 1),   Vec3f(70, 180, 1) };
+    Vec3f t2[3] = { Vec3f(180, 150, -1), Vec3f(120, 160, -1), Vec3f(130, 180, -1) };
+    drawTriangle(t0[0], t0[1], t0[2], zBuffer, image, red);
+    drawTriangle(t1[0], t1[1], t1[2], zBuffer, image, white);
+    drawTriangle(t2[0], t2[1], t2[2], zBuffer, image, green);
 
-    drawTriangle2(Vec2i(10, 10), Vec2i(100, 30), Vec2i(190, 160), image, green);
+    drawTriangle2(Vec3f(10, 10, 2), Vec3f(100, 30, 2), Vec3f(190, 160, 2), zBuffer, image, green);
 
-    drawModel(image);
+    drawModel(zBuffer, image);
 
     image.flip_vertically();
     image.write_tga_file("output.tga");
+
+    delete[] zBuffer;
 
     return 0;
 }
