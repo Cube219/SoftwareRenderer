@@ -79,32 +79,53 @@ Vec3f getBarycentricCoord(Vec3f a, Vec3f b, Vec3f c, Vec3f p)
     return Vec3f(1.f - (u.x + u.y) / u.z, u.y / u.z, u.x / u.z);
 }
 
-void drawTriangle(Vec3f t1, Vec3f t2, Vec3f t3, float* pZBuf, TGAImage& image, TGAColor color)
+void drawTriangle(Vec3f t1, Vec3f t2, Vec3f t3, float* pZBuf, TGAImage& image, TGAColor color, TGAImage* pTexture = nullptr,
+    Vec2f uv1 = {}, Vec2f uv2 = {}, Vec2f uv3 = {}, float intensity = 0.0f)
 {
-    if(t1.y > t2.y) std::swap(t1, t2);
-    if(t1.y > t3.y) std::swap(t1, t3);
-    if(t2.y > t3.y) std::swap(t2, t3);
+    if(t1.y > t2.y) {
+        std::swap(t1, t2);
+        std::swap(uv1, uv2);
+    }
+    if(t1.y > t3.y) {
+        std::swap(t1, t3);
+        std::swap(uv1, uv3);
+    }
+    if(t2.y > t3.y) {
+        std::swap(t2, t3);
+        std::swap(uv2, uv3);
+    }
 
     // Bottom half of triangle (t1-t3, t1-t2)
     for(int y = t1.y; y <= t2.y; y++) {
         float a = (float)(y - t1.y) / (t3.y - t1.y);
         float b = (float)(y - t1.y) / (t2.y - t1.y);
 
-        float aX = t1.x + (t3.x - t1.x) * a;
-        float bX = t1.x + (t2.x - t1.x) * b;
+        Vec3f begin = t1 + (t3 - t1) * a;
+        Vec3f end = t1 + (t2 - t1) * b;
+        Vec2f uvBegin = uv1 + (uv3 - uv1) * a;
+        Vec2f uvEnd = uv1 + (uv2 - uv1) * b;
 
-        if(aX > bX) std::swap(aX, bX);
-        for(int x = (int)aX; x <= (int)bX; x++) {
-            Vec3f s = getBarycentricCoord(t1, t2, t3, Vec3f(x, y, 0));
-
-            float z = t1.z * s.x;
-            z += t2.z * s.y;
-            z += t3.z * s.z;
+        if(begin.x > end.x) {
+            std::swap(begin, end);
+            std::swap(uvBegin, uvEnd);
+        }
+        for(int x = (int)begin.x; x <= (int)end.x; x++) {
+            float t = (float)(x - begin.x) / (end.x - begin.x);
+            Vec3f p = begin + (end - begin) * t;
+            Vec2f uvP = uvBegin + (uvEnd - uvBegin) * t;
 
             int zBufIndex = x + y * width;
-            if(pZBuf[zBufIndex] < z) {
-                pZBuf[zBufIndex] = z;
-                image.set(x, y, color);
+            if(pZBuf[zBufIndex] < p.z) {
+                pZBuf[zBufIndex] = p.z;
+
+                TGAColor c = color;
+                if(pTexture != nullptr) {
+                    c = pTexture->get(uvP.x * pTexture->get_width(), uvP.y * pTexture->get_height());
+                    c.r *= intensity;
+                    c.g *= intensity;
+                    c.b *= intensity;
+                }
+                image.set(x, y, c);
             }
         }
     }
@@ -114,29 +135,40 @@ void drawTriangle(Vec3f t1, Vec3f t2, Vec3f t3, float* pZBuf, TGAImage& image, T
         float a = (float)(y - t1.y) / (t3.y - t1.y);
         float b = (float)(y - t2.y) / (t3.y - t2.y);
 
-        float aX = t1.x + (t3.x - t1.x) * a;
-        float bX = t2.x + (t3.x - t2.x) * b;
+        Vec3f begin = t1 + (t3 - t1) * a;
+        Vec3f end = t2 + (t3 - t2) * b;
+        Vec2f uvBegin = uv1 + (uv3 - uv1) * a;
+        Vec2f uvEnd = uv2 + (uv3 - uv2) * b;
 
-        if(aX > bX) std::swap(aX, bX);
-        for(int x = (int)aX; x <= (int)bX; x++) {
-            Vec3f s = getBarycentricCoord(t1, t2, t3, Vec3f(x, y, 0));
-
-            float z = t1.z * s.x;
-            z += t2.z * s.y;
-            z += t3.z * s.z;
+        if(begin.x > end.x) {
+            std::swap(begin, end);
+            std::swap(uvBegin, uvEnd);
+        }
+        for(int x = (int)begin.x; x <= (int)end.x; x++) {
+            float t = (float)(x - begin.x) / (end.x - begin.x);
+            Vec3f p = begin + (end - begin) * t;
+            Vec2f uvP = uvBegin + (uvEnd - uvBegin) * t;
 
             int zBufIndex = x + y * width;
-            if(pZBuf[zBufIndex] < z) {
-                pZBuf[zBufIndex] = z;
-                image.set(x, y, color);
+            if(pZBuf[zBufIndex] < p.z) {
+                pZBuf[zBufIndex] = p.z;
+                
+                TGAColor c = color;
+                if(pTexture != nullptr) {
+                    c = pTexture->get(uvP.x * pTexture->get_width(), uvP.y * pTexture->get_height());
+                    c.r *= intensity;
+                    c.g *= intensity;
+                    c.b *= intensity;
+                }
+                image.set(x, y, c);
             }
         }
     }
 }
 
-void drawTriangle2(Vec3f t1, Vec3f t2, Vec3f t3, float* pZBuf, TGAImage& image, TGAColor color)
+void drawTriangle2(Vec3f t1, Vec3f t2, Vec3f t3, float* pZBuf, TGAImage& image, TGAColor color,
+    TGAImage* pTexture = nullptr, Vec2f uv1 = {}, Vec2f uv2 = {}, Vec2f uv3 = {}, float intensity = 0.0f)
 {
-    // Vec3f tri[3] = { t1, t2, t3 };
     Vec2f boxMin = Vec2f(t1.x, t1.y);
     Vec2f boxMax = Vec2f(t1.x, t1.y);
 
@@ -169,13 +201,30 @@ void drawTriangle2(Vec3f t1, Vec3f t2, Vec3f t3, float* pZBuf, TGAImage& image, 
             int zBufIndex = int(p.x) + int(p.y * width);
             if(pZBuf[zBufIndex] < p.z) {
                 pZBuf[zBufIndex] = p.z;
-                image.set(p.x, p.y, color);
+
+                TGAColor c = color;
+                if(pTexture != nullptr) {
+                    Vec2f uv;
+                    uv.x = uv1.x * s.x;
+                    uv.x += uv2.x * s.y;
+                    uv.x += uv3.x * s.z;
+                    uv.y = uv1.y * s.x;
+                    uv.y += uv2.y * s.y;
+                    uv.y += uv3.y * s.z;
+                    
+                    c = pTexture->get(uv.x * pTexture->get_width(), uv.y * pTexture->get_height());
+                    c.r *= intensity;
+                    c.g *= intensity;
+                    c.b *= intensity;
+                }
+
+                image.set(p.x, p.y, c);
             }
         }
     }
 }
 
-void drawModel(float* pZBuf, TGAImage& image)
+void drawModel(float* pZBuf, TGAImage& image, TGAImage& texture)
 {
     Model m = Model("obj/african_head.obj");
 
@@ -198,14 +247,24 @@ void drawModel(float* pZBuf, TGAImage& image)
         n.normalize();
         float intensity = n * lightDir;
         
+        Vec2f uvs[3];
+        uvs[0] = m.uv(face[0].uvIndex);
+        uvs[1] = m.uv(face[1].uvIndex);
+        uvs[2] = m.uv(face[2].uvIndex);
+
         if(intensity > 0) {
-            drawTriangle(screen[0], screen[1], screen[2], pZBuf, image, TGAColor(intensity * 255, intensity * 255, intensity * 255, 255));
+            // drawTriangle(screen[0], screen[1], screen[2], pZBuf, image, TGAColor(intensity * 255, intensity * 255, intensity * 255, 255));
+            drawTriangle2(screen[0], screen[1], screen[2], pZBuf, image, {}, &texture, uvs[0], uvs[1], uvs[2], intensity);
         }
     }
 }
 
 int main(void)
 {
+    TGAImage texture;
+    texture.read_tga_file("obj/african_head_diffuse.tga");
+    texture.flip_vertically();
+
     float* zBuffer = new float[width * height];
     for(int i = 0; i < width * height; i++) {
         zBuffer[i] = -std::numeric_limits<float>::max();
@@ -221,7 +280,7 @@ int main(void)
 
     drawTriangle2(Vec3f(10, 10, 2), Vec3f(100, 30, 2), Vec3f(190, 160, 2), zBuffer, image, green);
 
-    drawModel(zBuffer, image);
+    drawModel(zBuffer, image, texture);
 
     image.flip_vertically();
     image.write_tga_file("output.tga");

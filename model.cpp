@@ -14,11 +14,18 @@ Model::Model(const char *filename) : verts_(), uvs_(), faces_() {
         std::getline(in, line);
         std::istringstream iss(line.c_str());
         char trash;
-        if (!line.compare(0, 2, "v ")) {
+        if(!line.compare(0, 2, "v ")) {
             iss >> trash;
             Vec3f v;
-            for (int i=0;i<3;i++) iss >> v.raw[i];
+            for(int i = 0; i < 3; i++) iss >> v.raw[i];
             verts_.push_back(v);
+        } else if(!line.compare(0, 2, "vt")) {
+            iss >> trash >> trash;
+            Vec2f uv;
+            float ftrash;
+
+            iss >> uv.x >> uv.y >> ftrash;
+            uvs_.push_back(uv);
         } else if (!line.compare(0, 2, "f ")) {
             FaceInfo f[3];
             int itrash, idx, uv;
