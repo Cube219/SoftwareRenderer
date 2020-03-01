@@ -1,4 +1,5 @@
 ﻿#include <iostream>
+#include <string>
 
 #include "tgaimage.h"
 #include "model.h"
@@ -9,6 +10,24 @@ const TGAColor green = TGAColor(0, 255, 0, 255);
 
 const int width = 800;
 const int height = 800;
+const int depth = 250;
+Vec3f camera(0, 0, 3);
+
+Vec3f m2v(Matrix m)
+{
+    return Vec3f(m[0][0] / m[3][0], m[1][0] / m[3][0], m[2][0] / m[3][0]);
+}
+
+Matrix v2m(Vec3f v)
+{
+    Matrix m(4, 1);
+    m[0][0] = v.x;
+    m[1][0] = v.y;
+    m[2][0] = v.z;
+    m[3][0] = 1.0f;
+
+    return m;
+}
 
 void drawLine(int x1, int y1, int x2, int y2, TGAImage& image, TGAColor color)
 {
@@ -75,7 +94,7 @@ Vec3f getBarycentricCoord(Vec3f a, Vec3f b, Vec3f c, Vec3f p)
     /* `pts` and `P` has integer value as coordinates
        so `abs(u[2])` < 1 means `u[2]` is 0, that means
        triangle is degenerate, in this case return something with negative coordinates */
-    if(std::abs(u.z) < 1e-2) return Vec3f(-1, 1, 1);
+    if(std::abs(u.z) <= 1e-2) return Vec3f(-1, 1, 1);
     return Vec3f(1.f - (u.x + u.y) / u.z, u.y / u.z, u.x / u.z);
 }
 
@@ -95,72 +114,104 @@ void drawTriangle(Vec3f t1, Vec3f t2, Vec3f t3, float* pZBuf, TGAImage& image, T
         std::swap(uv2, uv3);
     }
 
+    Vec2i t1i = Vec2i((int)t1.x, (int)t1.y);
+    Vec2i t2i = Vec2i((int)t2.x, (int)t2.y);
+    Vec2i t3i = Vec2i((int)t3.x, (int)t3.y);
+
     // Bottom half of triangle (t1-t3, t1-t2)
-    for(int y = t1.y; y <= t2.y; y++) {
-        float a = (float)(y - t1.y) / (t3.y - t1.y);
-        float b = (float)(y - t1.y) / (t2.y - t1.y);
+    if(t1i.y != t2i.y) {
+        for(int y = t1i.y; y <= t2i.y; y++) {
+            if(y < 0) continue;
+            if(y > height) break;
 
-        Vec3f begin = t1 + (t3 - t1) * a;
-        Vec3f end = t1 + (t2 - t1) * b;
-        Vec2f uvBegin = uv1 + (uv3 - uv1) * a;
-        Vec2f uvEnd = uv1 + (uv2 - uv1) * b;
+            float a = (float)(y - t1i.y) / (t3i.y - t1i.y);
+            float b = (float)(y - t1i.y) / (t2i.y - t1i.y);
 
-        if(begin.x > end.x) {
-            std::swap(begin, end);
-            std::swap(uvBegin, uvEnd);
-        }
-        for(int x = (int)begin.x; x <= (int)end.x; x++) {
-            float t = (float)(x - begin.x) / (end.x - begin.x);
-            Vec3f p = begin + (end - begin) * t;
-            Vec2f uvP = uvBegin + (uvEnd - uvBegin) * t;
+            Vec2i begin = t1i + (t3i - t1i) * a;
+            Vec2i end = t1i + (t2i - t1i) * b;
+            float zBegin = t1.z + (t3.z - t1.z) * a;
+            float zEnd = t1.z + (t2.z - t1.z) * b;
+            Vec2f uvBegin = uv1 + (uv3 - uv1) * a;
+            Vec2f uvEnd = uv1 + (uv2 - uv1) * b;
 
-            int zBufIndex = x + y * width;
-            if(pZBuf[zBufIndex] < p.z) {
-                pZBuf[zBufIndex] = p.z;
+            if(begin.x == end.x) continue;
 
-                TGAColor c = color;
-                if(pTexture != nullptr) {
-                    c = pTexture->get(uvP.x * pTexture->get_width(), uvP.y * pTexture->get_height());
-                    c.r *= intensity;
-                    c.g *= intensity;
-                    c.b *= intensity;
+            if(begin.x > end.x) {
+                std::swap(begin, end);
+                std::swap(uvBegin, uvEnd);
+            }
+            for(int x = begin.x; x <= end.x; x++) {
+                if(x < 0) continue;
+                if(x > width) break;
+
+                float t = (float)(x - begin.x) / (end.x - begin.x); // 같으면 0으로 나누어짐
+
+                Vec2i p = begin + (end - begin) * t;
+                float z = zBegin + (zEnd - zBegin) * t;
+                Vec2f uvP = uvBegin + (uvEnd - uvBegin) * t;
+
+                int zBufIndex = x + y * width;
+                if(pZBuf[zBufIndex] < z) {
+                    pZBuf[zBufIndex] = z;
+
+                    TGAColor c = color;
+                    if(pTexture != nullptr) {
+                        c = pTexture->get(uvP.x * pTexture->get_width(), uvP.y * pTexture->get_height());
+                        c.r *= intensity;
+                        c.g *= intensity;
+                        c.b *= intensity;
+                    }
+                    image.set(x, y, c);
                 }
-                image.set(x, y, c);
             }
         }
     }
 
     // Top half of triangle (t1-t3, t2-t3)
-    for(int y = t2.y; y <= t3.y; y++) {
-        float a = (float)(y - t1.y) / (t3.y - t1.y);
-        float b = (float)(y - t2.y) / (t3.y - t2.y);
+    if(t2i.y != t3i.y) {
+        for(int y = t2i.y; y <= t3i.y; y++) {
+            if(y < 0) continue;
+            if(y > height) break;
 
-        Vec3f begin = t1 + (t3 - t1) * a;
-        Vec3f end = t2 + (t3 - t2) * b;
-        Vec2f uvBegin = uv1 + (uv3 - uv1) * a;
-        Vec2f uvEnd = uv2 + (uv3 - uv2) * b;
+            float a = (float)(y - t1i.y) / (t3i.y - t1i.y);
+            float b = (float)(y - t2i.y) / (t3i.y - t2i.y);
 
-        if(begin.x > end.x) {
-            std::swap(begin, end);
-            std::swap(uvBegin, uvEnd);
-        }
-        for(int x = (int)begin.x; x <= (int)end.x; x++) {
-            float t = (float)(x - begin.x) / (end.x - begin.x);
-            Vec3f p = begin + (end - begin) * t;
-            Vec2f uvP = uvBegin + (uvEnd - uvBegin) * t;
+            Vec2i begin = t1i + (t3i - t1i) * a;
+            Vec2i end = t2i + (t3i - t2i) * b;
+            float zBegin = t1.z + (t3.z - t1.z) * a;
+            float zEnd = t2.z + (t3.z - t2.z) * b;
+            Vec2f uvBegin = uv1 + (uv3 - uv1) * a;
+            Vec2f uvEnd = uv2 + (uv3 - uv2) * b;
 
-            int zBufIndex = x + y * width;
-            if(pZBuf[zBufIndex] < p.z) {
-                pZBuf[zBufIndex] = p.z;
-                
-                TGAColor c = color;
-                if(pTexture != nullptr) {
-                    c = pTexture->get(uvP.x * pTexture->get_width(), uvP.y * pTexture->get_height());
-                    c.r *= intensity;
-                    c.g *= intensity;
-                    c.b *= intensity;
+            if(begin.x == end.x) continue;
+
+            if(begin.x > end.x) {
+                std::swap(begin, end);
+                std::swap(uvBegin, uvEnd);
+            }
+            for(int x = begin.x; x <= end.x; x++) {
+                if(x < 0) continue;
+                if(x > width) break;
+
+                float t = (float)(x - begin.x) / (end.x - begin.x); // 같으면 0으로 나누어짐
+
+                Vec2i p = begin + (end - begin) * t;
+                float z = zBegin + (zEnd - zBegin) * t;
+                Vec2f uvP = uvBegin + (uvEnd - uvBegin) * t;
+
+                int zBufIndex = x + y * width;
+                if(pZBuf[zBufIndex] < z) {
+                    pZBuf[zBufIndex] = z;
+
+                    TGAColor c = color;
+                    if(pTexture != nullptr) {
+                        c = pTexture->get(uvP.x * pTexture->get_width(), uvP.y * pTexture->get_height());
+                        c.r *= intensity;
+                        c.g *= intensity;
+                        c.b *= intensity;
+                    }
+                    image.set(x, y, c);
                 }
-                image.set(x, y, c);
             }
         }
     }
@@ -169,8 +220,8 @@ void drawTriangle(Vec3f t1, Vec3f t2, Vec3f t3, float* pZBuf, TGAImage& image, T
 void drawTriangle2(Vec3f t1, Vec3f t2, Vec3f t3, float* pZBuf, TGAImage& image, TGAColor color,
     TGAImage* pTexture = nullptr, Vec2f uv1 = {}, Vec2f uv2 = {}, Vec2f uv3 = {}, float intensity = 0.0f)
 {
-    Vec2f boxMin = Vec2f(t1.x, t1.y);
-    Vec2f boxMax = Vec2f(t1.x, t1.y);
+    Vec2i boxMin = Vec2i(t1.x, t1.y);
+    Vec2i boxMax = Vec2i(t1.x, t1.y);
 
     if(boxMin.x > t2.x) boxMin.x = t2.x;
     if(boxMax.x < t2.x) boxMax.x = t2.x;
@@ -189,8 +240,8 @@ void drawTriangle2(Vec3f t1, Vec3f t2, Vec3f t3, float* pZBuf, TGAImage& image, 
     if(boxMax.y > imageHeight) boxMax.y = imageHeight;
 
     Vec3f p;
-    for(p.x = boxMin.x; p.x <= boxMax.x; p.x++) {
-        for(p.y = boxMin.y; p.y <= boxMax.y; p.y++) {
+    for(p.x = boxMin.x; p.x <= boxMax.x; p.x += 1.0f) {
+        for(p.y = boxMin.y; p.y <= boxMax.y; p.y += 1.0f) {
             Vec3f s = getBarycentricCoord(t1, t2, t3, p);
             if(s.x < 0 || s.y < 0 || s.z < 0) continue;
 
@@ -198,7 +249,7 @@ void drawTriangle2(Vec3f t1, Vec3f t2, Vec3f t3, float* pZBuf, TGAImage& image, 
             p.z += t2.z * s.y;
             p.z += t3.z * s.z;
             
-            int zBufIndex = int(p.x) + int(p.y * width);
+            int zBufIndex = int(p.x) + int(p.y) * width;
             if(pZBuf[zBufIndex] < p.z) {
                 pZBuf[zBufIndex] = p.z;
 
@@ -218,7 +269,7 @@ void drawTriangle2(Vec3f t1, Vec3f t2, Vec3f t3, float* pZBuf, TGAImage& image, 
                     c.b *= intensity;
                 }
 
-                image.set(p.x, p.y, c);
+                image.set(int(p.x), int(p.y), c);
             }
         }
     }
@@ -230,8 +281,23 @@ void drawModel(float* pZBuf, TGAImage& image, TGAImage& texture)
 
     Vec3f lightDir = Vec3f(0, 0, -1);
 
+    Matrix proj = Matrix::identity(4);
+    proj[3][2] = -1 / camera.z;
+    Matrix view = Matrix::identity(4);
+    view[0][3] = width / 2.0f;
+    view[1][3] = height / 2.0f;
+    view[2][3] = depth / 2.0f;
+    view[0][0] = width / 2.0f;
+    view[1][1] = height / 2.0f;
+    view[2][2] = depth / 2.0f;
+
+    Matrix viewproj = view * proj;
+
     FaceInfo face[3];
     for(int i = 0; i < m.nfaces(); i++) {
+        if(i == 83) {
+            i = 83;
+        }
         std::tie(face[0], face[1], face[2]) = m.face(i);
 
         Vec3f screen[3];
@@ -239,7 +305,7 @@ void drawModel(float* pZBuf, TGAImage& image, TGAImage& texture)
         for(int j = 0; j < 3; j++) {
             Vec3f v = m.vert(face[j].vertIndex);
 
-            screen[j] = Vec3f(int((v.x + 1.0f) * (width / 2)), int((v.y + 1.0f) * (height / 2)), v.z);
+            screen[j] = m2v(viewproj * v2m(v));
             world[j] = v;
         }
 
@@ -253,8 +319,8 @@ void drawModel(float* pZBuf, TGAImage& image, TGAImage& texture)
         uvs[2] = m.uv(face[2].uvIndex);
 
         if(intensity > 0) {
-            // drawTriangle(screen[0], screen[1], screen[2], pZBuf, image, TGAColor(intensity * 255, intensity * 255, intensity * 255, 255));
-            drawTriangle2(screen[0], screen[1], screen[2], pZBuf, image, {}, &texture, uvs[0], uvs[1], uvs[2], intensity);
+            // drawTriangle2(screen[0], screen[1], screen[2], pZBuf, image, TGAColor(intensity * 255, intensity * 255, intensity * 255, 255));
+            drawTriangle(screen[0], screen[1], screen[2], pZBuf, image, {}, &texture, uvs[0], uvs[1], uvs[2], intensity);
         }
     }
 }
