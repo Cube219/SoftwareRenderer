@@ -11,7 +11,7 @@ const TGAColor green = TGAColor(0, 255, 0, 255);
 const int width = 800;
 const int height = 800;
 const int depth = 250;
-Vec3f camera(0, 0, 3);
+Vec3f camera(3, 3, 5);
 
 Vec3f m2v(Matrix m)
 {
@@ -285,6 +285,34 @@ void drawTriangle2(Vec3f t1, Vec3f t2, Vec3f t3, float* pZBuf, TGAImage& image, 
     }
 }
 
+Matrix getLookAt(Vec3f eye, Vec3f center, Vec3f up)
+{
+    Vec3f z = eye - center;
+    z.normalize();
+    Vec3f x = cross(up, z);
+    x.normalize();
+    Vec3f y = cross(z, x);
+    y.normalize();
+
+    Matrix mInv = Matrix::identity(4);
+    mInv[0][0] = x.x;
+    mInv[0][1] = x.y;
+    mInv[0][2] = x.z;
+    mInv[1][0] = y.x;
+    mInv[1][1] = y.y;
+    mInv[1][2] = y.z;
+    mInv[2][0] = z.x;
+    mInv[2][1] = z.y;
+    mInv[2][2] = z.z;
+
+    Matrix move = Matrix::identity(4);
+    move[0][3] = -center.x;
+    move[1][3] = -center.y;
+    move[2][3] = -center.z;
+
+    return mInv * move;
+}
+
 void drawModel(float* pZBuf, TGAImage& image, TGAImage& texture)
 {
     Model m = Model("obj/african_head.obj");
@@ -293,15 +321,17 @@ void drawModel(float* pZBuf, TGAImage& image, TGAImage& texture)
 
     Matrix proj = Matrix::identity(4);
     proj[3][2] = -1 / camera.z;
-    Matrix view = Matrix::identity(4);
-    view[0][3] = width / 2.0f;
-    view[1][3] = height / 2.0f;
-    view[2][3] = depth / 2.0f;
-    view[0][0] = width / 2.0f;
-    view[1][1] = height / 2.0f;
-    view[2][2] = depth / 2.0f;
+    Matrix view = getLookAt(camera, Vec3f(0, 0, 0), Vec3f(0, 1, 0));
 
-    Matrix viewproj = view * proj;
+    Matrix viewPort = Matrix::identity(4);
+    viewPort[0][3] = width / 2.0f;
+    viewPort[1][3] = height / 2.0f;
+    viewPort[2][3] = depth / 2.0f;
+    viewPort[0][0] = width / 2.0f;
+    viewPort[1][1] = height / 2.0f;
+    viewPort[2][2] = depth / 2.0f;
+
+    Matrix sumTransform = viewPort * proj * view;
 
     FaceInfo face[3];
     for(int i = 0; i < m.nfaces(); i++) {
@@ -312,13 +342,14 @@ void drawModel(float* pZBuf, TGAImage& image, TGAImage& texture)
         for(int j = 0; j < 3; j++) {
             Vec3f v = m.vert(face[j].vertIndex);
 
-            screen[j] = m2v(viewproj * v2m(v));
+            screen[j] = m2v(sumTransform * v2m(v));
             world[j] = v;
         }
 
         Vec3f n = (world[2] - world[1]) ^ (world[2] - world[0]);
         n.normalize();
         float intensity = n * lightDir;
+        intensity = 1;
         
         Vec2f uvs[3];
         uvs[0] = m.uv(face[0].uvIndex);
