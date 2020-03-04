@@ -5,10 +5,12 @@
     <ClCompile Include="tgaimage.cpp" />
     <ClCompile Include="model.cpp" />
     <ClCompile Include="geometry.cpp" />
+    <ClCompile Include="renderer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="tgaimage.h" />
     <ClInclude Include="geometry.h" />
     <ClInclude Include="model.h" />
+    <ClInclude Include="renderer.h" />
   </ItemGroup>
 </Project>
