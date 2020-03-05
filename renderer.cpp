@@ -9,12 +9,12 @@ Renderer::Renderer(int width, int height) :
 
 void Renderer::SetCamera(Vec3f eye, Vec3f center, Vec3f up)
 {
-    Matrix proj = Matrix::identity(4);
+    Matrix proj = Matrix::identity();
     proj[3][2] = -1 / (eye-center).norm();
 
     Matrix view = GetLookAt(eye, center, up);
 
-    Matrix viewPort = Matrix::identity(4);
+    Matrix viewPort = Matrix::identity();
     viewPort[0][3] = mWidth / 2.0f;
     viewPort[1][3] = mHeight / 2.0f;
     viewPort[2][3] = 250 / 2.0f;
@@ -239,7 +239,7 @@ Vec3f Renderer::GetBarycentricCoord(Vec3f a, Vec3f b, Vec3f c, Vec3f p)
     Vec3f s1 = Vec3f(c.x - a.x, b.x - a.x, a.x - p.x);
     Vec3f s2 = Vec3f(c.y - a.y, b.y - a.y, a.y - p.y);
 
-    Vec3f u = s1 ^ s2;
+    Vec3f u = cross(s1, s2);
 
     /* `pts` and `P` has integer value as coordinates
         so `abs(u[2])` < 1 means `u[2]` is 0, that means
@@ -252,12 +252,12 @@ Matrix Renderer::GetLookAt(Vec3f eye, Vec3f center, Vec3f up)
 {
     Vec3f z = eye - center;
     z.normalize();
-    Vec3f x = up ^ z;
+    Vec3f x = cross(up, z);
     x.normalize();
-    Vec3f y = z ^ x;
+    Vec3f y = cross(z, x);
     y.normalize();
 
-    Matrix mInv = Matrix::identity(4);
+    Matrix mInv = Matrix::identity();
     mInv[0][0] = x.x;
     mInv[0][1] = x.y;
     mInv[0][2] = x.z;
@@ -268,7 +268,7 @@ Matrix Renderer::GetLookAt(Vec3f eye, Vec3f center, Vec3f up)
     mInv[2][1] = z.y;
     mInv[2][2] = z.z;
 
-    Matrix move = Matrix::identity(4);
+    Matrix move = Matrix::identity();
     move[0][3] = -center.x;
     move[1][3] = -center.y;
     move[2][3] = -center.z;

@@ -16,22 +16,6 @@ Vec3f camera(3, 3, 5);
 
 Renderer renderer(width, height);
 
-Vec3f m2v(Matrix m)
-{
-    return Vec3f(m[0][0] / m[3][0], m[1][0] / m[3][0], m[2][0] / m[3][0]);
-}
-
-Matrix v2m(Vec3f v)
-{
-    Matrix m(4, 1);
-    m[0][0] = v.x;
-    m[1][0] = v.y;
-    m[2][0] = v.z;
-    m[3][0] = 1.0f;
-
-    return m;
-}
-
 void drawModel(TGAImage& texture)
 {
     Model m = Model("obj/african_head.obj");
@@ -47,11 +31,11 @@ void drawModel(TGAImage& texture)
         for(int j = 0; j < 3; j++) {
             Vec3f v = m.vert(face[j].vertIndex);
 
-            screen[j] = m2v(sumTransform * v2m(v));
+            screen[j] = embed<3>(sumTransform * embed<4>(v));
             world[j] = v;
         }
 
-        Vec3f n = (world[2] - world[1]) ^ (world[2] - world[0]);
+        Vec3f n = cross(world[2] - world[1], world[2] - world[0]);
         n.normalize();
         
         Vec2f uvs[3];

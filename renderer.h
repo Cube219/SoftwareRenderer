@@ -4,6 +4,13 @@
 #include "geometry.h"
 #include <vector>
 
+class IShader
+{
+    virtual ~IShader() {}
+    virtual Vec3i vertex(int iface, int nthvert) = 0;
+    virtual bool fragment(Vec3f bar, TGAColor color) = 0; 
+};
+
 class Renderer
 {
 public:
@@ -23,22 +30,6 @@ public:
     }
 
 private:
-    Vec3f m2v(Matrix m)
-    {
-        return Vec3f(m[0][0] / m[3][0], m[1][0] / m[3][0], m[2][0] / m[3][0]);
-    }
-
-    Matrix v2m(Vec3f v)
-    {
-        Matrix m(4, 1);
-        m[0][0] = v.x;
-        m[1][0] = v.y;
-        m[2][0] = v.z;
-        m[3][0] = 1.0f;
-
-        return m;
-    }
-
     Vec3f GetBarycentricCoord(Vec3f a, Vec3f b, Vec3f c, Vec3f p);
     Matrix GetLookAt(Vec3f eye, Vec3f center, Vec3f up);
 
