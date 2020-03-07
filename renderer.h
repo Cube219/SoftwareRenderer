@@ -2,13 +2,25 @@
 
 #include "tgaimage.h"
 #include "geometry.h"
+#include "model.h"
 #include <vector>
+
+struct VertexAtribute
+{
+    Vec3f vert;
+    Vec2f uv;
+};
 
 class IShader
 {
+public:
+    IShader(Model& m) : model(m)
+    {}
     virtual ~IShader() {}
-    virtual Vec3i vertex(int iface, int nthvert) = 0;
-    virtual bool fragment(Vec3f bar, TGAColor color) = 0; 
+    virtual Vec4f vertex(FaceInfo f, int nthVertex) = 0;
+    virtual bool fragment(Vec3f bar, TGAColor& result) = 0;
+
+    Model& model;
 };
 
 class Renderer
@@ -21,8 +33,10 @@ public:
     Matrix GetTransform() const { return mSumTransform; }
 
     void DrawLine(Vec2i l1, Vec2i l2, TGAColor color);
-    void DrawTriangle(Vec3f t1, Vec3f t2, Vec3f t3, TGAImage& texture, Vec2f uv1, Vec2f uv2, Vec2f uv3);
-    void DrawTriangle2(Vec3f t1, Vec3f t2, Vec3f t3, TGAImage& texture, Vec2f uv1, Vec2f uv2, Vec2f uv3);
+    void DrawTriangle(Vec3f t1, Vec3f t2, Vec3f t3, IShader& shader);
+    void DrawTriangle2(Vec3f t1, Vec3f t2, Vec3f t3, IShader& shader);
+
+    void DrawModel(Model& model, IShader& shader);
 
     void WriteRenderTarget()
     {

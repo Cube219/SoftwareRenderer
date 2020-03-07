@@ -70,19 +70,20 @@ void Renderer::DrawLine(Vec2i l1, Vec2i l2, TGAColor color)
     }
 }
 
-void Renderer::DrawTriangle(Vec3f t1, Vec3f t2, Vec3f t3, TGAImage& texture, Vec2f uv1, Vec2f uv2, Vec2f uv3)
+void Renderer::DrawTriangle(Vec3f t1, Vec3f t2, Vec3f t3, IShader& shader)
 {
+    Vec3f prevT1 = t1;
+    Vec3f prevT2 = t2;
+    Vec3f prevT3 = t3;
+
     if(t1.y > t2.y) {
         std::swap(t1, t2);
-        std::swap(uv1, uv2);
     }
     if(t1.y > t3.y) {
         std::swap(t1, t3);
-        std::swap(uv1, uv3);
     }
     if(t2.y > t3.y) {
         std::swap(t2, t3);
-        std::swap(uv2, uv3);
     }
 
     Vec2i t1i = Vec2i((int)t1.x, (int)t1.y);
@@ -102,14 +103,11 @@ void Renderer::DrawTriangle(Vec3f t1, Vec3f t2, Vec3f t3, TGAImage& texture, Vec
             Vec2i end = t1i + (t2i - t1i) * b;
             float zBegin = t1.z + (t3.z - t1.z) * a;
             float zEnd = t1.z + (t2.z - t1.z) * b;
-            Vec2f uvBegin = uv1 + (uv3 - uv1) * a;
-            Vec2f uvEnd = uv1 + (uv2 - uv1) * b;
 
             if(begin.x == end.x) continue;
 
             if(begin.x > end.x) {
                 std::swap(begin, end);
-                std::swap(uvBegin, uvEnd);
             }
             for(int x = begin.x; x <= end.x; x++) {
                 if(x < 0) {
@@ -122,14 +120,18 @@ void Renderer::DrawTriangle(Vec3f t1, Vec3f t2, Vec3f t3, TGAImage& texture, Vec
 
                 Vec2i p = begin + (end - begin) * t;
                 float z = zBegin + (zEnd - zBegin) * t;
-                Vec2f uvP = uvBegin + (uvEnd - uvBegin) * t;
 
                 int zBufIndex = x + y * mWidth;
                 if(mZBuffer[zBufIndex] < z) {
                     mZBuffer[zBufIndex] = z;
 
-                    TGAColor c = texture.get(int(uvP.x * texture.get_width()), int(uvP.y * texture.get_height()));
-                    mRenderTarget.set(x, y, c);
+                    Vec3f s = GetBarycentricCoord(prevT1, prevT2, prevT3, Vec3f(p.x, p.y, 0));
+
+                    TGAColor c;
+                    bool isDiscard = shader.fragment(s, c);
+
+                    if(isDiscard == false)
+                        mRenderTarget.set(x, y, c);
                 }
             }
         }
@@ -148,14 +150,11 @@ void Renderer::DrawTriangle(Vec3f t1, Vec3f t2, Vec3f t3, TGAImage& texture, Vec
             Vec2i end = t2i + (t3i - t2i) * b;
             float zBegin = t1.z + (t3.z - t1.z) * a;
             float zEnd = t2.z + (t3.z - t2.z) * b;
-            Vec2f uvBegin = uv1 + (uv3 - uv1) * a;
-            Vec2f uvEnd = uv2 + (uv3 - uv2) * b;
 
             if(begin.x == end.x) continue;
 
             if(begin.x > end.x) {
                 std::swap(begin, end);
-                std::swap(uvBegin, uvEnd);
             }
             for(int x = begin.x; x <= end.x; x++) {
                 if(x < 0) {
@@ -168,21 +167,25 @@ void Renderer::DrawTriangle(Vec3f t1, Vec3f t2, Vec3f t3, TGAImage& texture, Vec
 
                 Vec2i p = begin + (end - begin) * t;
                 float z = zBegin + (zEnd - zBegin) * t;
-                Vec2f uvP = uvBegin + (uvEnd - uvBegin) * t;
 
                 int zBufIndex = x + y * mWidth;
                 if(mZBuffer[zBufIndex] < z) {
                     mZBuffer[zBufIndex] = z;
 
-                    TGAColor c = texture.get(int(uvP.x * texture.get_width()), int(uvP.y * texture.get_height()));
-                    mRenderTarget.set(x, y, c);
+                    Vec3f s = GetBarycentricCoord(prevT1, prevT2, prevT3, Vec3f(p.x, p.y, 0));
+
+                    TGAColor c;
+                    bool isDiscard = shader.fragment(s, c);
+
+                    if(isDiscard == false)
+                        mRenderTarget.set(x, y, c);
                 }
             }
         }
     }
 }
 
-void Renderer::DrawTriangle2(Vec3f t1, Vec3f t2, Vec3f t3, TGAImage & texture, Vec2f uv1, Vec2f uv2, Vec2f uv3)
+void Renderer::DrawTriangle2(Vec3f t1, Vec3f t2, Vec3f t3, IShader& shader)
 {
     Vec2i t1i = Vec2i((int)t1.x, (int)t1.y);
     Vec2i t2i = Vec2i((int)t2.x, (int)t2.y);
@@ -219,18 +222,27 @@ void Renderer::DrawTriangle2(Vec3f t1, Vec3f t2, Vec3f t3, TGAImage & texture, V
             if(mZBuffer[zBufIndex] < z) {
                 mZBuffer[zBufIndex] = z;
 
-                Vec2f uv;
-                uv.x = uv1.x * s.x;
-                uv.x += uv2.x * s.y;
-                uv.x += uv3.x * s.z;
-                uv.y = uv1.y * s.x;
-                uv.y += uv2.y * s.y;
-                uv.y += uv3.y * s.z;
-                TGAColor c = texture.get(int(uv.x * texture.get_width()), int(uv.y * texture.get_height()));
+                TGAColor c;
+                bool isDiscard = shader.fragment(s, c);
 
-                mRenderTarget.set(p.x, p.y, c);
+                if(isDiscard == false)
+                    mRenderTarget.set(p.x, p.y, c);
             }
         }
+    }
+}
+
+void Renderer::DrawModel(Model& model, IShader& shader)
+{
+    FaceInfo face[3];
+    for(int i = 0; i < model.nfaces(); i++) {
+        std::tie(face[0], face[1], face[2]) = model.face(i);
+
+        Vec4f screen[3];
+        for(int j = 0; j < 3; j++) {
+            screen[j] = shader.vertex(face[j], j);
+        }
+        DrawTriangle(embed<3>(screen[0]), embed<3>(screen[1]), embed<3>(screen[2]), shader);
     }
 }
 
