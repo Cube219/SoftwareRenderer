@@ -14,15 +14,16 @@ void Renderer::SetCamera(Vec3f eye, Vec3f center, Vec3f up)
 
     Matrix view = GetLookAt(eye, center, up);
 
-    Matrix viewPort = Matrix::identity();
-    viewPort[0][3] = mWidth / 2.0f;
-    viewPort[1][3] = mHeight / 2.0f;
-    viewPort[2][3] = 250 / 2.0f;
-    viewPort[0][0] = mWidth / 2.0f;
-    viewPort[1][1] = -mHeight / 2.0f;
-    viewPort[2][2] = 250 / 2.0f;
+    mViewPort = Matrix::identity();
+    mViewPort[0][3] = mWidth / 2.0f;
+    mViewPort[1][3] = mHeight / 2.0f;
+    mViewPort[2][3] = 250 / 2.0f;
+    mViewPort[0][0] = mWidth / 2.0f;
+    mViewPort[1][1] = -mHeight / 2.0f;
+    mViewPort[2][2] = 250 / 2.0f;
 
-    mSumTransform = viewPort * proj * view;
+    mProjView = proj * view;
+    mSumTransform = mViewPort * mProjView;
 }
 
 void Renderer::DrawLine(Vec2i l1, Vec2i l2, TGAColor color)

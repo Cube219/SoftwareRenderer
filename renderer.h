@@ -30,7 +30,8 @@ public:
 
     void SetCamera(Vec3f eye, Vec3f center, Vec3f up);
 
-    Matrix GetTransform() const { return mSumTransform; }
+    Matrix GetSumTransform() const { return mSumTransform; }
+    Matrix GetProjView() const { return mProjView; }
 
     void DrawLine(Vec2i l1, Vec2i l2, TGAColor color);
     void DrawTriangle(Vec3f t1, Vec3f t2, Vec3f t3, IShader& shader);
@@ -52,4 +53,6 @@ private:
     TGAImage mRenderTarget;
     std::vector<float> mZBuffer;
     Matrix mSumTransform;
+    Matrix mProjView;
+    Matrix mViewPort;
 };
