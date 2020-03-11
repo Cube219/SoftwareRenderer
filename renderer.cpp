@@ -23,7 +23,6 @@ void Renderer::SetCamera(Vec3f eye, Vec3f center, Vec3f up)
     mViewPort[2][2] = 250 / 2.0f;
 
     mProjView = proj * view;
-    mSumTransform = mViewPort * mProjView;
 }
 
 void Renderer::DrawLine(Vec2i l1, Vec2i l2, TGAColor color)
@@ -242,6 +241,7 @@ void Renderer::DrawModel(Model& model, IShader& shader)
         Vec4f screen[3];
         for(int j = 0; j < 3; j++) {
             screen[j] = shader.vertex(face[j], j);
+            screen[j] = mViewPort * screen[j];
         }
         DrawTriangle(embed<3>(screen[0]), embed<3>(screen[1]), embed<3>(screen[2]), shader);
     }

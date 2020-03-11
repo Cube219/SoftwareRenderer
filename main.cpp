@@ -28,26 +28,42 @@ public:
     virtual Vec4f vertex(FaceInfo f, int nthVertex) override
     {
         uvs.set_col(nthVertex, model.uv(f.uvIndex));
+        normals.set_col(nthVertex, proj<3>(projViewInvertTranspose * embed<4>(model.normal(f.normIndex), 0.0f)));
 
-        return sumTransform * embed<4>(model.vert(f.vertIndex));
+        Vec4f resV = projView * embed<4>(model.vert(f.vertIndex));
+        ndc_tri.set_col(nthVertex, proj<3>(resV / resV[3]));
+
+        return resV;
     }
 
     virtual bool fragment(Vec3f bar, TGAColor& result) override
     {
         Vec2f uv = uvs * bar;
+        Vec3f normal = (normals * bar).normalize();
 
-        TGAColor normal = normalMap.get(int(uv.x * normalMap.get_width()), int(uv.y * normalMap.get_height()));
+        mat<3, 3, float> A;
+        A[0] = ndc_tri.col(1) - ndc_tri.col(0);
+        A[1] = ndc_tri.col(2) - ndc_tri.col(0);
+        A[2] = normal;
+
+        mat<3, 3, float> AI = A.invert();
+        
+        Vec3f i = AI * Vec3f(uvs[0][1] - uvs[0][0], uvs[0][2] - uvs[0][0], 0);
+        Vec3f j = AI * Vec3f(uvs[1][1] - uvs[1][0], uvs[1][2] - uvs[1][0], 0);
+
+        mat<3, 3, float> B;
+        B.set_col(0, i.normalize());
+        B.set_col(1, j.normalize());
+        B.set_col(2, normal);
+
+        TGAColor normalColor = normalMap.get(int(uv.x * normalMap.get_width()), int(uv.y * normalMap.get_height()));
         Vec3f n;
-        n.x = (float)normal.r / 255 * 2 - 1;
-        n.y = (float)normal.g / 255 * 2 - 1;
-        n.z = (float)normal.b / 255 * 2 - 1;
+        n.x = (float)normalColor.r / 255 * 2 - 1;
+        n.y = (float)normalColor.g / 255 * 2 - 1;
+        n.z = (float)normalColor.b / 255 * 2 - 1;
+        n = (B * n).normalize();
 
-        Matrix tangentSpaceToObjectSpace;
-
-        n = proj<3>(projViewInvertTranspose * embed<4>(n)).normalize();
-        Vec3f l = proj<3>(projView * embed<4>(light)).normalize();
-
-        float intensity = n * l;
+        float intensity = n * light;
         if(intensity < 0.0f) intensity = 0.0f;
         if(intensity > 1.0f) intensity = 1.0f;
         result = texture.get(int(uv.x * texture.get_width()), int(uv.y * texture.get_height()));
@@ -58,10 +74,11 @@ public:
         return false;
     }
 
-    Matrix sumTransform;
     Matrix projView;
     Matrix projViewInvertTranspose;
     mat<2, 3, float> uvs;
+    mat<3, 3, float> normals;
+    mat<3, 3, float> ndc_tri;
     TGAImage& texture;
     TGAImage& normalMap;
 };
@@ -77,13 +94,13 @@ int main(void)
     texture.flip_vertically();
 
     TGAImage normalMap;
-    normalMap.read_tga_file("obj/african_head_nm.tga");
+    normalMap.read_tga_file("obj/african_head_nm_tangent.tga");
     normalMap.flip_vertically();
 
     GouraudShader shader(m, texture, normalMap);
 
-    shader.sumTransform = renderer.GetSumTransform();
     shader.projView = renderer.GetProjView();
+    light = proj<3>(shader.projView * embed<4>(light, 0.0f)).normalize();
     shader.projViewInvertTranspose = shader.projView.invert_transpose();
 
     renderer.DrawModel(m, shader);
