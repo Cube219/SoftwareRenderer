@@ -77,16 +77,20 @@ public:
 
 int main(void)
 {
-    renderer.SetCamera(Vec3f(1, 3, 6), Vec3f(0, 0, 0), Vec3f(0, 1, 0));
+    // renderer.SetCamera(Vec3f(1, 3, 6), Vec3f(0, 0, 0), Vec3f(0, 1, 0));
+    renderer.SetCamera(Vec3f(0, 0, 6), Vec3f(0, 0, 0), Vec3f(0, 1, 0));
 
-    Model m = Model("obj/african_head.obj");
+    // Model m = Model("obj/african_head.obj");
+    Model m = Model("obj/diablo3_pose.obj");
 
     TGAImage texture;
-    texture.read_tga_file("obj/african_head_diffuse.tga");
+    // texture.read_tga_file("obj/african_head_diffuse.tga");
+    texture.read_tga_file("obj/diablo3_pose_diffuse.tga");
     texture.flip_vertically();
 
     TGAImage normalMap;
-    normalMap.read_tga_file("obj/african_head_nm_tangent.tga");
+    // normalMap.read_tga_file("obj/african_head_nm_tangent.tga");
+    normalMap.read_tga_file("obj/diablo3_pose_nm_tangent.tga");
     normalMap.flip_vertically();
 
     GouraudShader shader(m, texture, normalMap);
