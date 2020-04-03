@@ -388,3 +388,4 @@ MigrationBackup/
 
 output*.tga
 !obj/
+!obj/*.obj
