@@ -18,6 +18,9 @@ private:
 	std::vector<Vec2f> uvs_;
 	std::vector<std::tuple<FaceInfo, FaceInfo, FaceInfo>> faces_;
 	std::vector<Vec3f> norms_;
+	std::vector<Vec3f> tangents_;
+
+	void calculateTangent();
 public:
 	Model(const char *filename);
 	~Model();
@@ -26,6 +29,7 @@ public:
 	Vec3f vert(int i);
 	Vec2f uv(int i);
 	Vec3f normal(int i);
+	Vec3f tangent(int i);
 	std::tuple<FaceInfo, FaceInfo, FaceInfo> face(int idx);
 };
 

@@ -29,9 +29,9 @@ public:
     {
         uvs.set_col(nthVertex, model.uv(f.uvIndex));
         normals.set_col(nthVertex, proj<3>(projViewInvertTranspose * embed<4>(model.normal(f.normIndex), 0.0f)));
+        tangents.set_col(nthVertex, proj<3>(projViewInvertTranspose * embed<4>(model.tangent(f.normIndex), 0.0f)));
 
         Vec4f resV = projView * embed<4>(model.vert(f.vertIndex));
-        ndc_tri.set_col(nthVertex, proj<3>(resV / resV[3]));
 
         return resV;
     }
@@ -40,28 +40,20 @@ public:
     {
         Vec2f uv = uvs * bar;
         Vec3f normal = (normals * bar).normalize();
+        Vec3f tangent = (tangents * bar).normalize();
+        Vec3f bitangent = cross(normal, tangent).normalize();
 
-        mat<3, 3, float> A;
-        A[0] = ndc_tri.col(1) - ndc_tri.col(0);
-        A[1] = ndc_tri.col(2) - ndc_tri.col(0);
-        A[2] = normal;
-
-        mat<3, 3, float> AI = A.invert();
-        
-        Vec3f i = AI * Vec3f(uvs[0][1] - uvs[0][0], uvs[0][2] - uvs[0][0], 0);
-        Vec3f j = AI * Vec3f(uvs[1][1] - uvs[1][0], uvs[1][2] - uvs[1][0], 0);
-
-        mat<3, 3, float> B;
-        B.set_col(0, i.normalize());
-        B.set_col(1, j.normalize());
-        B.set_col(2, normal);
+        mat<3, 3, float> TBN;
+        TBN.set_col(0, tangent);
+        TBN.set_col(1, bitangent);
+        TBN.set_col(2, normal);
 
         TGAColor normalColor = normalMap.get(int(uv.x * normalMap.get_width()), int(uv.y * normalMap.get_height()));
         Vec3f n;
         n.x = (float)normalColor.r / 255 * 2 - 1;
         n.y = (float)normalColor.g / 255 * 2 - 1;
         n.z = (float)normalColor.b / 255 * 2 - 1;
-        n = (B * n).normalize();
+        n = (TBN * n).normalize();
 
         float intensity = n * light;
         if(intensity < 0.0f) intensity = 0.0f;
@@ -78,7 +70,7 @@ public:
     Matrix projViewInvertTranspose;
     mat<2, 3, float> uvs;
     mat<3, 3, float> normals;
-    mat<3, 3, float> ndc_tri;
+    mat<3, 3, float> tangents;
     TGAImage& texture;
     TGAImage& normalMap;
 };
