@@ -53,6 +53,10 @@ struct TGAColor
 		for(int i = 0; i < bpp; i++) {
 			raw[i] = p[i];
 		}
+
+		if(bpp == 1) {
+			raw[1] = raw[2] = raw[3] = raw[0];
+		}
 	}
 
 	TGAColor& operator =(const TGAColor& c)

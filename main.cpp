@@ -18,11 +18,13 @@ Vec3f light(1, 1, 1);
 
 Renderer renderer(width, height);
 
+int rMax, gMax, bMax;
+
 class GouraudShader : public IShader
 {
 public:
-    GouraudShader(Model& m, TGAImage& t, TGAImage& n) : IShader(m),
-        texture(t), normalMap(n)
+    GouraudShader(Model& m, TGAImage& t, TGAImage& s, TGAImage& n) : IShader(m),
+        texture(t), spec(s), normalMap(n)
     {}
 
     virtual Vec4f vertex(FaceInfo f, int nthVertex) override
@@ -55,13 +57,26 @@ public:
         n.z = (float)normalColor.b / 255 * 2 - 1;
         n = (TBN * n).normalize();
 
-        float intensity = n * light;
-        if(intensity < 0.0f) intensity = 0.0f;
-        if(intensity > 1.0f) intensity = 1.0f;
+        // Diffuse
+        float diffuse = n * light;
+        if(diffuse < 0.0f) diffuse = 0.0f;
+        if(diffuse > 1.0f) diffuse = 1.0f;
         result = texture.get(int(uv.x * texture.get_width()), int(uv.y * texture.get_height()));
-        result.r *= intensity;
-        result.g *= intensity;
-        result.b *= intensity;
+
+        // Specular
+        Vec3f r = (n * (n * light) * 2) - light;
+        r.normalize();
+        float rz = r.z;
+        if(rz < 0) rz = 0;
+        Vec3f s;
+
+        s.x = pow(rz, (float)spec.get(int(uv.x * spec.get_width()), int(uv.y * spec.get_height())).r);
+        s.y = pow(rz, (float)spec.get(int(uv.x * spec.get_width()), int(uv.y * spec.get_height())).g);
+        s.z = pow(rz, (float)spec.get(int(uv.x * spec.get_width()), int(uv.y * spec.get_height())).b);
+
+        result.r *= (diffuse + s.x * 0.6f);
+        result.g *= (diffuse + s.y * 0.6f);
+        result.b *= (diffuse + s.z * 0.6f);
 
         return false;
     }
@@ -72,28 +87,34 @@ public:
     mat<3, 3, float> normals;
     mat<3, 3, float> tangents;
     TGAImage& texture;
+    TGAImage& spec;
     TGAImage& normalMap;
 };
 
 int main(void)
 {
-    // renderer.SetCamera(Vec3f(1, 3, 6), Vec3f(0, 0, 0), Vec3f(0, 1, 0));
-    renderer.SetCamera(Vec3f(0, 0, 6), Vec3f(0, 0, 0), Vec3f(0, 1, 0));
+    renderer.SetCamera(Vec3f(1, 3, 6), Vec3f(0, 0, 0), Vec3f(0, 1, 0));
+    // renderer.SetCamera(Vec3f(0, 0, 6), Vec3f(0, 0, 0), Vec3f(0, 1, 0));
 
-    // Model m = Model("obj/african_head.obj");
-    Model m = Model("obj/diablo3_pose.obj");
+    Model m = Model("obj/african_head.obj");
+    // Model m = Model("obj/diablo3_pose.obj");
 
     TGAImage texture;
-    // texture.read_tga_file("obj/african_head_diffuse.tga");
-    texture.read_tga_file("obj/diablo3_pose_diffuse.tga");
+    texture.read_tga_file("obj/african_head_diffuse.tga");
+    // texture.read_tga_file("obj/diablo3_pose_diffuse.tga");
     texture.flip_vertically();
 
+    TGAImage spec;
+    spec.read_tga_file("obj/african_head_spec.tga");
+    // spec.read_tga_file("obj/diablo3_pose_spec.tga");
+    spec.flip_vertically();
+
     TGAImage normalMap;
-    // normalMap.read_tga_file("obj/african_head_nm_tangent.tga");
-    normalMap.read_tga_file("obj/diablo3_pose_nm_tangent.tga");
+    normalMap.read_tga_file("obj/african_head_nm_tangent.tga");
+    // normalMap.read_tga_file("obj/diablo3_pose_nm_tangent.tga");
     normalMap.flip_vertically();
 
-    GouraudShader shader(m, texture, normalMap);
+    GouraudShader shader(m, texture, spec, normalMap);
 
     shader.projView = renderer.GetProjView();
     light = proj<3>(shader.projView * embed<4>(light, 0.0f)).normalize();
@@ -102,6 +123,8 @@ int main(void)
     renderer.DrawModel(m, shader);
 
     renderer.WriteRenderTarget();
+
+    std::cout << rMax << " " << gMax << " " << bMax << std::endl;
 
     return 0;
 }
